@@ -150,6 +150,7 @@ class CLI(object):
         sshpass = None
         becomepass = None
         become_prompt = ''
+        smartcard_pin = None
 
         try:
             if op.ask_pass:
@@ -166,10 +167,13 @@ class CLI(object):
                     becomepass = sshpass
                 if becomepass:
                     becomepass = to_bytes(becomepass)
+
+            if op.ask_pin:
+                smartcard_pin = getpass.getpass(prompt="pin: ")
         except EOFError:
             pass
 
-        return (sshpass, becomepass)
+        return (sshpass, becomepass, smartcard_pin)
 
     def normalize_become_options(self):
         ''' this keeps backwards compatibility with sudo/su self.options '''
@@ -287,6 +291,10 @@ class CLI(object):
             connect_group = optparse.OptionGroup(parser, "Connection Options", "control as whom and how to connect to hosts")
             connect_group.add_option('-k', '--ask-pass', default=C.DEFAULT_ASK_PASS, dest='ask_pass', action='store_true',
                 help='ask for connection password')
+            connect_group.add_option('-Z', '--ask-pin', default=None, dest='ask_pin', action='store_true',
+                help='ask for smartcard pin')
+            connect_group.add_option('-L', '--pkcs11provider', default=None, dest='pkcs11provider',
+                help='Specifies which PKCS#11 provider to use. The argument to this keyword is the PKCS#11 shared library ssh(1) should use to communicate with a PKCS#11 token providing the users private RSA key.')
             connect_group.add_option('--private-key','--key-file', default=C.DEFAULT_PRIVATE_KEY_FILE, dest='private_key_file',
                 help='use this file to authenticate the connection')
             connect_group.add_option('-u', '--user', default=C.DEFAULT_REMOTE_USER, dest='remote_user',

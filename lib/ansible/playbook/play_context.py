@@ -208,6 +208,7 @@ class PlayContext(Base):
 
         self.password    = passwords.get('conn_pass','')
         self.become_pass = passwords.get('become_pass','')
+        self.smartcard_pin = passwords.get('smartcard_pin','')
 
         self.prompt      = ''
         self.success_key = ''

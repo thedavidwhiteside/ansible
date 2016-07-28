@@ -100,8 +100,8 @@ class PlaybookCLI(CLI):
         # don't deal with privilege escalation or passwords when we don't need to
         if not self.options.listhosts and not self.options.listtasks and not self.options.listtags and not self.options.syntax:
             self.normalize_become_options()
-            (sshpass, becomepass) = self.ask_passwords()
-            passwords = { 'conn_pass': sshpass, 'become_pass': becomepass }
+            (sshpass, becomepass, smartcard_pin) = self.ask_passwords()
+            passwords = { 'conn_pass': sshpass, 'become_pass': becomepass, 'smartcard_pin': smartcard_pin }
 
         loader = DataLoader()
 

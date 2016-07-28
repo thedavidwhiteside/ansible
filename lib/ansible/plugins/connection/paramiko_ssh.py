@@ -33,6 +33,7 @@ import traceback
 import fcntl
 import sys
 import re
+import inspect
 
 from termios import tcflush, TCIFLUSH
 from binascii import hexlify
@@ -221,17 +222,32 @@ class Connection(ConnectionBase):
             if self._play_context.private_key_file:
                 key_filename = os.path.expanduser(self._play_context.private_key_file)
 
-            ssh.connect(
-                self._play_context.remote_addr,
-                username=self._play_context.remote_user,
-                allow_agent=allow_agent,
-                look_for_keys=True,
-                key_filename=key_filename,
-                password=self._play_context.password,
-                timeout=self._play_context.timeout,
-                port=port,
-                **sock_kwarg
-            )
+            if "smartcard_pin" not in inspect.getargspec(ssh.connect)[0]:
+                ssh.connect(
+                    self._play_context.remote_addr,
+                    username=self._play_context.remote_user,
+                    allow_agent=allow_agent,
+                    look_for_keys=True,
+                    key_filename=key_filename,
+                    password=self._play_context.password,
+                    timeout=self._play_context.timeout,
+                    port=port,
+                    **sock_kwarg
+                    )
+            elif self._play_context.smartcard_pin is not None and self._play_context.pkcs11provider is not None:
+                ssh.connect(
+                    self._play_context.remote_addr,
+                    username=self._play_context.remote_user,
+                    allow_agent=allow_agent,
+                    look_for_keys=True,
+                    key_filename=key_filename,
+                    password=self._play_context.password,
+                    timeout=self._play_context.timeout,
+                    port=port,
+                    smartcard_pin=self._play_context.smartcard_pin,
+                    pkcs11provider=self._play_context.pkcs11provider,
+                    **sock_kwarg
+                    )
         except Exception as e:
             msg = str(e)
             if "PID check failed" in msg:
