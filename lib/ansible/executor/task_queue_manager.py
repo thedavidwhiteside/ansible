@@ -289,7 +289,8 @@ class TaskQueueManager:
         self._cleanup_pkcs11()
 
     def _cleanup_pkcs11(self):
-        paramiko.pkcs11_close_session(self._options.pkcs11provider)
+        if self._options.smartcard_pin is not None:
+            paramiko.pkcs11_close_session(self._options.pkcs11provider)
 
     def _cleanup_processes(self):
         if self._result_prc:
