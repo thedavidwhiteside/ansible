@@ -22,6 +22,7 @@ __metaclass__ = type
 import multiprocessing
 import os
 import tempfile
+import paramiko
 
 from ansible import constants as C
 from ansible.errors import AnsibleError
@@ -285,6 +286,10 @@ class TaskQueueManager:
         self.terminate()
         self._final_q.close()
         self._cleanup_processes()
+        self._cleanup_pkcs11()
+
+    def _cleanup_pkcs11(self):
+        paramiko.pkcs11_close_session(self._options.pkcs11provider)
 
     def _cleanup_processes(self):
         if self._result_prc:

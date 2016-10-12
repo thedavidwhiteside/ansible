@@ -27,6 +27,7 @@ import pwd
 import random
 import re
 import string
+import paramiko
 
 from ansible.compat.six import iteritems, string_types
 from ansible import constants as C
@@ -199,6 +200,8 @@ class PlayContext(Base):
     _step             = FieldAttribute(isa='bool', default=False)
     _diff             = FieldAttribute(isa='bool', default=False)
 
+    _pkcs11session = None
+
     def __init__(self, play=None, options=None, passwords=None, connection_lockfd=None):
 
         super(PlayContext, self).__init__()
@@ -209,6 +212,8 @@ class PlayContext(Base):
         self.password    = passwords.get('conn_pass','')
         self.become_pass = passwords.get('become_pass','')
         self.smartcard_pin = passwords.get('smartcard_pin','')
+        self.pkcs11provider = '/usr/local/lib/opensc-pkcs11.so'
+        self.pkcs11session = PlayContext._pkcs11session
 
         self.prompt      = ''
         self.success_key = ''
@@ -220,8 +225,17 @@ class PlayContext(Base):
         if options:
             self.set_options(options)
 
+        if PlayContext._pkcs11session is None:
+            self.set_pkcs11()
+
         if play:
             self.set_play(play)
+
+    def set_pkcs11(self):
+        if self.smartcard_pin is not None:
+            # PKCS11 Init Session
+            PlayContext._pkcs11session = paramiko.pkcs11_open_session(self.pkcs11provider, self.smartcard_pin)
+            self.pkcs11session = PlayContext._pkcs11session
 
     def set_play(self, play):
         '''
@@ -265,6 +279,9 @@ class PlayContext(Base):
         self.become        = options.become
         self.become_method = options.become_method
         self.become_user   = options.become_user
+
+        # pkcs11
+        self.pkcs11provider = str(options.pkcs11provider)
 
         self.check_mode = boolean(options.check)
 

@@ -22,7 +22,7 @@ __metaclass__ = type
 from ansible.compat.six.moves import queue
 
 import json
-import multiprocessing
+import threading
 import os
 import signal
 import sys
@@ -57,7 +57,7 @@ except ImportError:
 __all__ = ['WorkerProcess']
 
 
-class WorkerProcess(multiprocessing.Process):
+class WorkerProcess(threading.Thread):
     '''
     The worker thread class, which uses TaskExecutor to run tasks
     read from a job queue and pushes results into a results queue

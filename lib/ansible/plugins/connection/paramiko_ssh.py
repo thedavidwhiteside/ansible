@@ -238,14 +238,11 @@ class Connection(ConnectionBase):
                 ssh.connect(
                     self._play_context.remote_addr,
                     username=self._play_context.remote_user,
-                    allow_agent=allow_agent,
-                    look_for_keys=True,
-                    key_filename=key_filename,
-                    password=self._play_context.password,
                     timeout=self._play_context.timeout,
                     port=port,
-                    smartcard_pin=self._play_context.smartcard_pin,
-                    pkcs11provider=self._play_context.pkcs11provider,
+                    smartcard_pin=str(self._play_context.smartcard_pin),
+                    pkcs11provider=str(self._play_context.pkcs11provider),
+                    pkcs11session=self._play_context.pkcs11session,
                     **sock_kwarg
                     )
         except Exception as e:
