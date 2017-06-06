@@ -222,7 +222,7 @@ class Connection(ConnectionBase):
             if self._play_context.private_key_file:
                 key_filename = os.path.expanduser(self._play_context.private_key_file)
 
-            if "smartcard_pin" not in inspect.getargspec(ssh.connect)[0]:
+            if "pkcs11pin" not in inspect.getargspec(ssh.connect)[0]:
                 ssh.connect(
                     self._play_context.remote_addr,
                     username=self._play_context.remote_user,
@@ -240,7 +240,7 @@ class Connection(ConnectionBase):
                     username=self._play_context.remote_user,
                     timeout=self._play_context.timeout,
                     port=port,
-                    smartcard_pin=str(self._play_context.smartcard_pin),
+                    pkcs11pin=str(self._play_context.smartcard_pin),
                     pkcs11provider=str(self._play_context.pkcs11provider),
                     pkcs11session=self._play_context.pkcs11session,
                     **sock_kwarg
