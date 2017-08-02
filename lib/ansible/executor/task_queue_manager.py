@@ -106,6 +106,9 @@ class TaskQueueManager:
         # plugins for inter-process locking.
         self._connection_lockfile = tempfile.TemporaryFile()
 
+	# pkcs11 session tracking
+	self.pkcs11_session_opened = False
+
     def _initialize_processes(self, num):
         self._workers = []
 
@@ -274,6 +277,10 @@ class TaskQueueManager:
         # and run the play using the strategy and cleanup on way out
         play_return = strategy.run(iterator, play_context)
 
+	# pkcs11 session opened
+	if play_context._pkcs11session is not None:
+	    self.pkcs11_session_opened = True
+
         # now re-save the hosts that failed from the iterator to our internal list
         for host_name in iterator.get_failed_hosts():
             self._failed_hosts[host_name] = True
@@ -286,7 +293,8 @@ class TaskQueueManager:
         self.terminate()
         self._final_q.close()
         self._cleanup_processes()
-        self._cleanup_pkcs11()
+	if self.pkcs11_session_opened is True:
+            self._cleanup_pkcs11()
 
     def _cleanup_pkcs11(self):
         if self.passwords.get('smartcard_pin','') is not None:
