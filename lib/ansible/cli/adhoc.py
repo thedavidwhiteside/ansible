@@ -108,8 +108,8 @@ class AdHocCLI(CLI):
         b_vault_pass = None
 
         self.normalize_become_options()
-        (sshpass, becomepass) = self.ask_passwords()
-        passwords = { 'conn_pass': sshpass, 'become_pass': becomepass }
+        (sshpass, becomepass, pkcs11_pin) = self.ask_passwords()
+        passwords = { 'conn_pass': sshpass, 'become_pass': becomepass, 'pkcs11_pin': pkcs11_pin}
 
         loader = DataLoader()
 

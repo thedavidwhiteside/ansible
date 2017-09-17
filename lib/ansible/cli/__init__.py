@@ -202,6 +202,7 @@ class CLI(with_metaclass(ABCMeta, object)):
         sshpass = None
         becomepass = None
         become_prompt = ''
+        pkcs11_pin = None
 
         try:
             if op.ask_pass:
@@ -218,10 +219,13 @@ class CLI(with_metaclass(ABCMeta, object)):
                     becomepass = sshpass
                 if becomepass:
                     becomepass = to_bytes(becomepass)
+
+            if op.ask_pkcs11_pin:
+                pkcs11_pin = getpass.getpass(prompt="pkcs11 pin: ")
         except EOFError:
             pass
 
-        return (sshpass, becomepass)
+        return (sshpass, becomepass, pkcs11_pin)
 
     def normalize_become_options(self):
         ''' this keeps backwards compatibility with sudo/su self.options '''
@@ -343,6 +347,10 @@ class CLI(with_metaclass(ABCMeta, object)):
             connect_group = optparse.OptionGroup(parser, "Connection Options", "control as whom and how to connect to hosts")
             connect_group.add_option('-k', '--ask-pass', default=C.DEFAULT_ASK_PASS, dest='ask_pass', action='store_true',
                 help='ask for connection password')
+            connect_group.add_option('-Z', '--ask-pkcs11-pin', dest='ask_pkcs11_pin', action='store_true',
+                help='ask for smartcard pin')
+            connect_group.add_option('-L', '--pkcs11-provider', default='/usr/local/lib/opensc-pkcs11.so', dest='pkcs11_provider',
+                help='Specifies which PKCS#11 provider to use. The argument to this keyword is the PKCS#11 shared library ssh(1) should use to communicate with a PKCS#11 token providing the users private RSA key.')
             connect_group.add_option('--private-key','--key-file', default=C.DEFAULT_PRIVATE_KEY_FILE, dest='private_key_file',
                 help='use this file to authenticate the connection',
                 action="callback", callback=CLI.unfrack_path, type=str)

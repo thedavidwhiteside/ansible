@@ -218,6 +218,9 @@ class PlayContext(Base):
     _gather_timeout   = FieldAttribute(isa='string', default=C.DEFAULT_GATHER_TIMEOUT)
     _fact_path        = FieldAttribute(isa='string', default=C.DEFAULT_FACT_PATH)
 
+    _pkcs11_pin = None
+    _pkcs11_session = None
+
     def __init__(self, play=None, options=None, passwords=None, connection_lockfd=None):
 
         super(PlayContext, self).__init__()
@@ -227,6 +230,12 @@ class PlayContext(Base):
 
         self.password    = passwords.get('conn_pass','')
         self.become_pass = passwords.get('become_pass','')
+
+        if PlayContext._pkcs11_pin is None:
+            PlayContext._pkcs11_pin = passwords.get('pkcs11_pin', '') 
+        self.pkcs11_pin = PlayContext._pkcs11_pin
+        self.pkcs11_provider = '/usr/local/lib/opensc-pkcs11.so' # Default
+        self.pkcs11_session = PlayContext._pkcs11_session
 
         self.prompt      = ''
         self.success_key = ''
@@ -241,6 +250,13 @@ class PlayContext(Base):
         if play:
             self.set_play(play)
 
+
+    def set_pkcs11_session(self, session):
+        '''
+        Set the pkcs11 session
+        '''
+        if PlayContext._pkcs11_session is None:
+            self.pkcs11_session = PlayContext._pkcs11_session = session
 
     def set_play(self, play):
         '''
@@ -286,6 +302,7 @@ class PlayContext(Base):
         self.become_user   = options.become_user
 
         self.check_mode = boolean(options.check)
+        self.pkcs11_provider = str(options.pkcs11_provider)
 
         # get ssh options FIXME: make these common to all connections
         for flag in ['ssh_common_args', 'docker_extra_args', 'sftp_extra_args', 'scp_extra_args', 'ssh_extra_args']:

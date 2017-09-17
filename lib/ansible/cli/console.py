@@ -413,8 +413,8 @@ class ConsoleCLI(CLI, cmd.Cmd):
             setattr(self, 'help_' + module, lambda module=module: self.helpdefault(module))
 
         self.normalize_become_options()
-        (sshpass, becomepass) = self.ask_passwords()
-        self.passwords = { 'conn_pass': sshpass, 'become_pass': becomepass }
+        (sshpass, becomepass, pkcs11_pin) = self.ask_passwords()
+        self.passwords = { 'conn_pass': sshpass, 'become_pass': becomepass, 'pkcs11_pin': pkcs11_pin}
 
         self.loader = DataLoader()
 

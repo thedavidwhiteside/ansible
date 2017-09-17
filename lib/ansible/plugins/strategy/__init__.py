@@ -33,6 +33,7 @@ from ansible.compat.six import iteritems, string_types
 from ansible.errors import AnsibleError, AnsibleParserError, AnsibleUndefinedVariable
 from ansible.executor import action_write_locks
 from ansible.executor.process.worker import WorkerProcess
+from ansible.executor.thread.worker import WorkerThread
 from ansible.executor.task_result import TaskResult
 from ansible.inventory.host import Host
 from ansible.inventory.group import Group
@@ -125,6 +126,9 @@ class StrategyBase:
         self._results_thread.daemon = True
         self._results_thread.start()
 
+        # Thread vs Process
+        self.threading_method = 'process' # thread | process
+
     def cleanup(self):
         self._final_q.put(_sentinel)
         self._results_thread.join()
@@ -210,7 +214,16 @@ class StrategyBase:
             while True:
                 (worker_prc, rslt_q) = self._workers[self._cur_worker]
                 if worker_prc is None or not worker_prc.is_alive():
-                    worker_prc = WorkerProcess(self._final_q, task_vars, host, task, play_context, self._loader, self._variable_manager, shared_loader_obj)
+                    if play_context.pkcs11_pin is not None and play_context.connection == "paramiko":
+                        # pkcs11 support in paramiko does not support multiprocessing, must use threads
+                        self.threading_method = 'thread'
+                     # thread | process
+                    if self.threading_method == 'process':
+                        worker_prc = WorkerProcess(self._final_q, task_vars, host, task, play_context, self._loader, self._variable_manager, shared_loader_obj)
+                    elif self.threading_method == 'thread':
+                        worker_prc = WorkerThread(self._final_q, task_vars, host, task, play_context, self._loader, self._variable_manager, shared_loader_obj)
+                    else:
+                        raise AnsibleError("Unknown threading_method for plugin used")
                     self._workers[self._cur_worker][0] = worker_prc
                     worker_prc.start()
                     display.debug("worker is %d (out of %d available)" % (self._cur_worker+1, len(self._workers)))

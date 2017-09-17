@@ -33,6 +33,7 @@ import traceback
 import fcntl
 import sys
 import re
+import inspect
 
 from termios import tcflush, TCIFLUSH
 from binascii import hexlify
@@ -67,6 +68,7 @@ HAVE_PARAMIKO=False
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     try:
+        from paramiko import pkcs11
         import paramiko
         HAVE_PARAMIKO=True
         logging.getLogger("paramiko").setLevel(logging.WARNING)
@@ -127,6 +129,14 @@ class MyAddPolicy(object):
 SSH_CONNECTION_CACHE = {}
 SFTP_CONNECTION_CACHE = {}
 
+
+class Pkcs11Session(object):
+    def __init__(self, pkcs11_provider, pkcs11_pin):
+        self.session = None # incase open_session fails, set session to something for the __del__
+        self.session = pkcs11.open_session(pkcs11_provider, pkcs11_pin)
+    def __del__(self):
+        if self.session is not None:
+            pkcs11.close_session(self.session)
 
 class Connection(ConnectionBase):
     ''' SSH based connections with Paramiko '''
@@ -234,17 +244,38 @@ class Connection(ConnectionBase):
             if self._play_context.private_key_file:
                 key_filename = os.path.expanduser(self._play_context.private_key_file)
 
-            ssh.connect(
-                self._play_context.remote_addr,
-                username=self._play_context.remote_user,
-                allow_agent=allow_agent,
-                look_for_keys=C.PARAMIKO_LOOK_FOR_KEYS,
-                key_filename=key_filename,
-                password=self._play_context.password,
-                timeout=self._play_context.timeout,
-                port=port,
-                **sock_kwarg
-            )
+            # If using pkcs11 in Ansible, but no pkcs11 session has been initialied, initialize it
+            pkcs11_session = None
+            if self._play_context.pkcs11_pin is not None and self._play_context.pkcs11_session is None:
+                # initialize session object, it automatically opens and closes the pkcs11 session
+                pkcs11_session_obj = Pkcs11Session(self._play_context.pkcs11_provider, self._play_context.pkcs11_pin)
+                self._play_context.set_pkcs11_session(pkcs11_session_obj)
+            if self._play_context.pkcs11_session is not None:
+                if "pkcs11_session" not in inspect.getargspec(ssh.connect)[0]:
+                    raise AnsibleError("pkcs11 is not supported in your version of paramiko. paramiko version >= 2.3.0 supports pkcs11")
+                # Get the session from the play context
+                pkcs11_session = self._play_context.pkcs11_session.session
+                ssh.connect(
+                    self._play_context.remote_addr,
+                    username=self._play_context.remote_user,
+                    allow_agent=allow_agent,
+                    timeout=self._play_context.timeout,
+                    port=port,
+                    pkcs11_session=pkcs11_session,
+                    **sock_kwarg
+                    )
+            else:
+                ssh.connect(
+                    self._play_context.remote_addr,
+                    username=self._play_context.remote_user,
+                    allow_agent=allow_agent,
+                    look_for_keys=C.PARAMIKO_LOOK_FOR_KEYS,
+                    key_filename=key_filename,
+                    password=self._play_context.password,
+                    timeout=self._play_context.timeout,
+                    port=port,
+                    **sock_kwarg
+                    )
         except paramiko.ssh_exception.BadHostKeyException as e:
             raise AnsibleConnectionFailure('host key mismatch for %s' % e.hostname)
         except Exception as e:

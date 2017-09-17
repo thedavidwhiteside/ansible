@@ -75,8 +75,12 @@ def _ssh_retry(func):
             cmd = args[0]
             if attempt != 0 and self._play_context.password and isinstance(cmd, list):
                 # If this is a retry, the fd/pipe for sshpass is closed, and we need a new one
-                self.sshpass_pipe = os.pipe()
-                cmd[1] = b'-d' + to_bytes(self.sshpass_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict')
+                self.sshpass_password_pipe = os.pipe()
+                cmd[1] = b'-d' + to_bytes(self.sshpass_password_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict')
+            if attempt != 0 and self._play_context.pkcs11_pin is not None and isinstance(cmd, list):
+                # If this is a retry, the fd/pipe for sshpass is closed, and we need a new one
+                self.sshpass_pkcs11_pin_pipe = os.pipe()
+                cmd[1] = b'-d' + to_bytes(self.sshpass_pkcs11_pin_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict')
 
             try:
                 try:
@@ -225,17 +229,27 @@ class Connection(ConnectionBase):
         # If we want to use password authentication, we have to set up a pipe to
         # write the password to sshpass.
 
-        if self._play_context.password:
+        if self._play_context.password or self._play_context.pkcs11_pin is not None:
             if not self._sshpass_available():
-                raise AnsibleError("to use the 'ssh' connection type with passwords, you must install the sshpass program")
+                raise AnsibleError("to use the 'ssh' connection type with passwords or pkcs11_pin, you must install the sshpass program")
 
-            self.sshpass_pipe = os.pipe()
-            b_command += [b'sshpass', b'-d' + to_bytes(self.sshpass_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict')]
+        if self._play_context.password:
+            self.sshpass_password_pipe = os.pipe()
+            b_command += [b'sshpass', b'-d' + to_bytes(self.sshpass_password_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict')]
+
+        if self._play_context.pkcs11_pin is not None:
+            self.sshpass_pkcs11_pin_pipe = os.pipe()
+            b_command += [b'sshpass', b'-d' + to_bytes(self.sshpass_pkcs11_pin_pipe[0], nonstring='simplerepr', errors='surrogate_or_strict'), b'-P', b'Enter PIN for ']
 
         if binary == 'ssh':
             b_command += [to_bytes(self._play_context.ssh_executable, errors='surrogate_or_strict')]
         else:
             b_command += [to_bytes(binary, errors='surrogate_or_strict')]
+
+        if self._play_context.pkcs11_pin is not None:
+            self._add_args(b_command,
+                          (b'-I', to_bytes(self._play_context.pkcs11_provider)),
+                          u'pkcs11 not set')
 
         #
         # Next, additional arguments based on the configuration.
@@ -417,14 +431,7 @@ class Connection(ConnectionBase):
 
         return b''.join(output), remainder
 
-    def _bare_run(self, cmd, in_data, sudoable=True, checkrc=True):
-        '''
-        Starts the command and communicates with it until it ends.
-        '''
-
-        display_cmd = list(map(shlex_quote, map(to_text, cmd)))
-        display.vvv(u'SSH: EXEC {0}'.format(u' '.join(display_cmd)), host=self.host)
-
+    def _sshpass_build_pipe(self, sshpass_pipe, secret, cmd, in_data):
         # Start the given command. If we don't need to pipeline data, we can try
         # to use a pseudo-tty (ssh will have been invoked with -tt). If we are
         # pipelining data, or can't create a pty, we fall back to using plain
@@ -432,17 +439,12 @@ class Connection(ConnectionBase):
 
         p = None
 
-        if isinstance(cmd, (text_type, binary_type)):
-            cmd = to_bytes(cmd)
-        else:
-            cmd = list(map(to_bytes, cmd))
-
         if not in_data:
             try:
                 # Make sure stdin is a proper pty to avoid tcgetattr errors
                 master, slave = pty.openpty()
-                if PY3 and self._play_context.password:
-                    p = subprocess.Popen(cmd, stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=self.sshpass_pipe)
+                if PY3 and secret:
+                    p = subprocess.Popen(cmd, stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=sshpass_pipe)
                 else:
                     p = subprocess.Popen(cmd, stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 stdin = os.fdopen(master, 'wb', 0)
@@ -451,8 +453,8 @@ class Connection(ConnectionBase):
                 p = None
 
         if not p:
-            if PY3 and self._play_context.password:
-                p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=self.sshpass_pipe)
+            if PY3 and secret:
+                p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, pass_fds=sshpass_pipe)
             else:
                 p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdin = p.stdin
@@ -460,15 +462,37 @@ class Connection(ConnectionBase):
         # If we are using SSH password authentication, write the password into
         # the pipe we opened in _build_command.
 
-        if self._play_context.password:
-            os.close(self.sshpass_pipe[0])
+        if secret:
+            os.close(sshpass_pipe[0])
             try:
-                os.write(self.sshpass_pipe[1], to_bytes(self._play_context.password) + b'\n')
+                os.write(sshpass_pipe[1], to_bytes(secret) + b'\n')
             except OSError as e:
                 # Ignore broken pipe errors if the sshpass process has exited.
                 if e.errno != errno.EPIPE or p.poll() is None:
                     raise
-            os.close(self.sshpass_pipe[1])
+            os.close(sshpass_pipe[1])
+        return (sshpass_pipe, p, stdin)
+
+    def _bare_run(self, cmd, in_data, sudoable=True, checkrc=True):
+        '''
+        Starts the command and communicates with it until it ends.
+        '''
+
+        display_cmd = list(map(shlex_quote, map(to_text, cmd)))
+        display.vvv(u'SSH: EXEC {0}'.format(u' '.join(display_cmd)), host=self.host)
+        p = None
+
+        if isinstance(cmd, (text_type, binary_type)):
+            cmd = to_bytes(cmd)
+        else:
+            cmd = list(map(to_bytes, cmd))
+
+        if self._play_context.pkcs11_pin is not None:
+            (self.sshpass_pkcs11_pin_pipe, p, stdin) = self._sshpass_build_pipe(self.sshpass_pkcs11_pin_pipe, self._play_context.pkcs11_pin, cmd, in_data)
+        elif self._play_context.password:
+            (self.sshpass_password_pipe, p, stdin) = self._sshpass_build_pipe(self.sshpass_password_pipe, self._play_context.password, cmd, in_data)
+        else:
+            raise AnsibleError("Bare run should not have been run") 
 
         #
         # SSH state machine
