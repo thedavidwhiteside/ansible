@@ -235,7 +235,6 @@ class PlayContext(Base):
             PlayContext._pkcs11_pin = passwords.get('pkcs11_pin', '') 
         self.pkcs11_pin = PlayContext._pkcs11_pin
         self.pkcs11_provider = '/usr/local/lib/opensc-pkcs11.so' # Default
-        self.pkcs11_session = PlayContext._pkcs11_session
 
         self.prompt      = ''
         self.success_key = ''
@@ -251,12 +250,18 @@ class PlayContext(Base):
             self.set_play(play)
 
 
+    def get_pkcs11_session(self):
+        '''
+        Get the pkcs11 session
+        '''
+        return PlayContext._pkcs11_session
+
     def set_pkcs11_session(self, session):
         '''
         Set the pkcs11 session
         '''
         if PlayContext._pkcs11_session is None:
-            self.pkcs11_session = PlayContext._pkcs11_session = session
+            PlayContext._pkcs11_session = session
 
     def set_play(self, play):
         '''
