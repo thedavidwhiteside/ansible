@@ -248,7 +248,7 @@ class Connection(ConnectionBase):
 
         if self._play_context.pkcs11_pin is not None:
             self._add_args(b_command,
-                          (b'-I', to_bytes(self._play_context.pkcs11_provider)),
+                          (b'-o', b'PKCS11Provider=' + to_bytes(self._play_context.pkcs11_provider)),
                           u'pkcs11 not set')
 
         #
