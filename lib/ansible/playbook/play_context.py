@@ -234,7 +234,7 @@ class PlayContext(Base):
     def set_pkcs11(self):
         if self.smartcard_pin is not None:
             # PKCS11 Init Session
-            PlayContext._pkcs11session = paramiko.pkcs11_open_session(self.pkcs11provider, self.smartcard_pin)
+            PlayContext._pkcs11session = paramiko.pkcs11.open_session("/usr/local/lib/opensc-pkcs11.so", self.smartcard_pin)
             self.pkcs11session = PlayContext._pkcs11session
 
     def set_play(self, play):

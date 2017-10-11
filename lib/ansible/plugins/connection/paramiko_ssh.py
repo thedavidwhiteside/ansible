@@ -222,7 +222,7 @@ class Connection(ConnectionBase):
             if self._play_context.private_key_file:
                 key_filename = os.path.expanduser(self._play_context.private_key_file)
 
-            if "pkcs11session" not in inspect.getargspec(ssh.connect)[0]:
+            if "pkcs11_session" not in inspect.getargspec(ssh.connect)[0]:
                 ssh.connect(
                     self._play_context.remote_addr,
                     username=self._play_context.remote_user,
@@ -240,7 +240,7 @@ class Connection(ConnectionBase):
                     username=self._play_context.remote_user,
                     timeout=self._play_context.timeout,
                     port=port,
-                    pkcs11session=self._play_context.pkcs11session,
+                    pkcs11_session=self._play_context.pkcs11session,
                     **sock_kwarg
                     )
         except Exception as e:
