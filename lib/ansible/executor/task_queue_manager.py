@@ -108,6 +108,7 @@ class TaskQueueManager:
 
 	# pkcs11 session tracking
 	self.pkcs11_session_opened = False
+        self.pkcs11_session = None
 
     def _initialize_processes(self, num):
         self._workers = []
@@ -280,6 +281,7 @@ class TaskQueueManager:
 	# pkcs11 session opened
 	if play_context._pkcs11session is not None:
 	    self.pkcs11_session_opened = True
+	    self.pkcs11_session = play_context._pkcs11session
 
         # now re-save the hosts that failed from the iterator to our internal list
         for host_name in iterator.get_failed_hosts():
@@ -298,7 +300,7 @@ class TaskQueueManager:
 
     def _cleanup_pkcs11(self):
         if self.passwords.get('smartcard_pin','') is not None:
-            paramiko.pkcs11.close_session(self._options.pkcs11provider)
+            paramiko.pkcs11.close_session(self.pkcs11_session)
 
     def _cleanup_processes(self):
         if self._result_prc:
