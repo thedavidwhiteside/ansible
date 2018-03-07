@@ -897,6 +897,13 @@ DEFAULT_SCP_IF_SSH:
   env: [{name: ANSIBLE_SCP_IF_SSH}]
   ini:
   - {key: scp_if_ssh, section: ssh_connection}
+pkcs11_provider:
+  default: ""
+  description:
+    - "PKCS11 SmartCard provider such as opensc, example: /usr/local/lib/opensc-pkcs11.so"
+  env: [{name: ANSIBLE_PKCS11_PROVIDER}]
+  ini:
+    - {key: pkcs11_provider, section: ssh_connection}
 DEFAULT_SELINUX_SPECIAL_FS:
   name: Problematic file systems
   default: fuse, nfs, vboxsf, ramfs, 9p
